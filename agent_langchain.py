@@ -1,25 +1,25 @@
-import os
-import time
-import requests
-import logging
-import imaplib
+import base64
 import email
+import faulthandler
+import imaplib
+import logging
+import os
+import quopri
+import threading
+import time
+from datetime import datetime, timedelta
 from email import policy
 from email.utils import parsedate_to_datetime
+from urllib.parse import urlparse, parse_qs, unquote
+
+import backoff
+import requests
 from bs4 import BeautifulSoup
 from dotenv import load_dotenv
-from datetime import datetime, timedelta
-import quopri
-import base64
-import re
-import threading
-import backoff
-import faulthandler
-import sys
 # 导入 LangChain 所需的库
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_ollama.llms import OllamaLLM
-from urllib.parse import urlparse, parse_qs, unquote
+
 
 def print_tracebacks():
     threading.Timer(120, print_tracebacks).start()

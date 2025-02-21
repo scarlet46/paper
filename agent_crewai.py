@@ -1,33 +1,37 @@
-import os
-import time
-import requests
-import logging
-import imaplib
+import base64
 import email
+import faulthandler
+import imaplib
+import logging
+import os
+import quopri
+import re
+import time
+from datetime import datetime, timedelta
 from email import policy
 from email.utils import parsedate_to_datetime
-from bs4 import BeautifulSoup
-from dotenv import load_dotenv
-from datetime import datetime, timedelta
-import quopri
-import base64
-import re
-import backoff
-import re
 from urllib.parse import urlparse, parse_qs, unquote
-from crewai import Agent, Task, Crew,LLM
+
+import backoff
+import requests
+from bs4 import BeautifulSoup
+from crewai import Agent, Task, Crew, LLM
 from crewai.telemetry import Telemetry
-import signal
-import faulthandler
-import sys
+from dotenv import load_dotenv
+
+from feishu.feishu import file_upload
+from pdf_server import process_pdf
+
 os.environ["OTEL_SDK_DISABLED"] = "true"
 faulthandler.enable()
-import threading
-def print_tracebacks():
-    threading.Timer(120, print_tracebacks).start()  # 每5秒打印一次
-    faulthandler.dump_traceback()
 
-print_tracebacks()
+
+# import threading
+# def print_tracebacks():
+#     threading.Timer(120, print_tracebacks).start()  # 每5秒打印一次
+#     faulthandler.dump_traceback()
+#
+# print_tracebacks()
 
 
 def noop(*args, **kwargs):
@@ -39,31 +43,37 @@ for attr in dir(Telemetry):
     if callable(getattr(Telemetry, attr)) and not attr.startswith("__"):
         setattr(Telemetry, attr, noop)
 
+# def cleanup_processes():
+#     # Get all active threads
+#     for thread in threading.enumerate():
+#         if thread != threading.current_thread():
+#             try:
+#                 thread.join(timeout=1.0)  # Give threads 1 second to cleanup
+#             except:
+#                 pass
+#
+#
+#
+# # Register cleanup on program exit
+# def signal_handler(signum, frame):
+#     cleanup_processes()
+#     sys.exit(0)
+#
+# signal.signal(signal.SIGINT, signal_handler)
+# signal.signal(signal.SIGTERM, signal_handler)
 
-def cleanup_processes():
-    # Get all active threads
-    for thread in threading.enumerate():
-        if thread != threading.current_thread():
-            try:
-                thread.join(timeout=1.0)  # Give threads 1 second to cleanup
-            except:
-                pass
-                
 
-
-# Register cleanup on program exit
-def signal_handler(signum, frame):
-    cleanup_processes()
-    sys.exit(0)
-
-signal.signal(signal.SIGINT, signal_handler)
-signal.signal(signal.SIGTERM, signal_handler)
-
-Model = "ollama/qwen2.5:14b"
 # 设置 Ollama API 环境变量
 # os.environ["OLLAMA_API_KEY"] = "your_ollama_api_key"
-os.environ["OPENAI_API_KEY"] = "your_openai_api_key"
-llm = LLM(model=Model, base_url="http://localhost:11434",api_key="your_openai_api_key")
+Model = "gpt-4o-mini"
+os.environ["OPENAI_API_KEY"] = "sk-tA4X88vrZDn2RV5GDe54Ec3743744d7eBaB8F8Ae8a73F1Cf"
+llm = LLM(model=Model, base_url="https://api.fast-tunnel.one/v1",
+          api_key="sk-tA4X88vrZDn2RV5GDe54Ec3743744d7eBaB8F8Ae8a73F1Cf")
+
+# Model = "deepseek-chat"
+# llm = LLM(model=Model, base_url="https://api.deepseek.com/v1",
+#           api_key="sk-5346b4837c81477592d7503a3de034ec")
+# os.environ["OPENAI_API_KEY"] = "sk-tA4X88vrZDn2RV5GDe54Ec3743744d7eBaB8F8Ae8a73F1Cf"
 
 os.environ['CREWAI_TELEMETRY_OPT_OUT'] = 'FALSE'
 # Load environment variables
@@ -72,18 +82,27 @@ load_dotenv()
 # Set up logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
-# QQ email IMAP settings
+# QQ email IMAP settings----
+# IMAP_SERVER = 'imap.qq.com'
+# EMAIL_ACCOUNT = '2353050774@qq.com'
+# # 授权码
+# PASSWORD = 'ftiqtavrpghddjeg'
 IMAP_SERVER = 'imap.qq.com'
-EMAIL_ACCOUNT = os.getenv('QQ_EMAIL')
-PASSWORD = os.getenv('QQ_PASSWORD')
+EMAIL_ACCOUNT = '105150326@qq.com'
+# 授权码
+PASSWORD = 'smoevzzqpdmkcadd'
+
+# IMAP_SERVER = 'imap.163.com'
+# EMAIL_ACCOUNT = 'shilu_46@163.com'
+# PASSWORD = 'XBdsr38YKHhDAZNh'
 
 # Firecrawl API settings
 FIRECRAWL_API_KEY = os.getenv('FIRECRAWL_API_KEY')
 FIRECRAWL_API_URL = 'http://140.143.139.183:3002/v1'
 
-# Define the email criteria
-SENDER_EMAIL = 'scholaralerts-noreply@google.com'
-DAYS_RECENT = 3  # Set this to the number of recent days you want to filter emails by
+# 监控发件人邮箱地址
+SENDER_EMAIL = 'cshljnls-mailer@alerts.highwire.org'
+DAYS_RECENT = 3
 
 
 
@@ -100,24 +119,51 @@ def process_agent():
         llm=llm
     )
 
-def create_process_task(markdown_content):
+
+def create_process_task(markdown_content, url):
     return Task(
         description=(
-            f"请清理以下网页内容，将其转换为学术论文的格式，然后将清理后的内容翻译成中文，并总结主要内容。"
-            f"请确保输出的格式中，论文标题使用一级标题（#），其他部分（研究问题、关键词、方法、创新点和结论）使用二级标题（##）。"
+            # f"请清理以下网页内容，将其转换为学术论文的格式，然后将清理后的内容翻译成中文，并总结主要内容。"
+            # f"请确保输出的格式中，论文标题使用一级标题（#），其他部分（研究问题、关键词、方法、创新点和结论）使用二级标题（##）。"
+            f"请清理以下 PDF 文件内容，并将其转换为学术论文的格式，同时翻译成中文。\n"
+            f"确保输出的格式如下：\n"
+            f" 【bioRxiv链接】：{url}\n"
+            f"【精读地址】从 PDF 中提取的 DOI 链接或官方发布地址  \n"
+            f"【代码地址】从 PDF 中提取的代码仓库地址，如 GitHub/Zenodo 等，若无则填写“文中未提供”  \n"
+            f"- 论文标题使用一级标题（#）\n"
+            f"- 其他部分（研究问题、关键词、方法、创新点和结论）使用二级标题（##）\n"
+            f"- 删除冗余信息，如广告、非学术内容、页眉页脚等\n"
+            f"- 仅保留正文内容，并优化语言表达，使其符合学术论文风格\n"
+            f"- 从 PDF 文件中提取论文标题、作者、DOI、arXiv/bioRxiv 链接（如果有）\n"
+            f"- 提取代码地址（如果存在），若无则标注为“文中未提供”\n"
+            f"- 生成论文首页的截图（PNG 格式）\n\n"
+            f"- '生物信息学算法'、'生物数据分析'还是'计算生物学建模' 为文献领域分类的 一级分类 \n\n"
+            f"- 机器学习、序列分析、基因比对、结构预测、算法开发、深度学习、大模型、数据处理、单细胞数据注释工具、单细胞多组学分析、空间转录组数据分析、统计分析、多组学整合（基因组、转录组、蛋白质组、代谢组、表观组等）、实验数据挖掘、数学建模、系统生物学、计算模拟、网络分析和生物物理建模 为二级分类, \n\n"
+            f"请确保最终输出格式如下（请使用 Markdown 格式）：\n\n"
             f"\n\n内容如下：\n\n{markdown_content}"
         ),
         agent=process_agent(),
         expected_output=(
-            "输出翻译后的论文内容（中文），格式如下：\n\n"
-            "# 标题\n"
-            "## 关键词\n"
-            "## 研究问题\n"
-            "## 方法\n"
-            "## 创新点\n"
-            "## 结论\n\n"
-            "请以 Markdown 格式呈现，不要输出任何无关内容，参考文献也不需要输出。"
-            "标题、研究问题、方法、创新点和结论都必须输出中文。"
+            f"请严格按照格式整理 PDF 内容，不要输出无关信息，参考文献可忽略。\n"
+            f"研究问题、方法、创新点和结论均需输出中文。"
+            f"文章首页（带标题）截图（PNG格式)"
+            "输出翻译后的论文内容（中文），最终返回的格式参考如下大纲格式如下：\n\n"
+            f"【bioRxiv链接】：{url}\n"
+            f"【精读地址】\n"
+            f"【代码地址】\n"
+            "论文中文标题"
+            "论文英文标题"
+            "关键词"
+            "期刊"
+            "作者和作者单位"
+            "研究问题"
+            "方法"
+            "创新点"
+            "文献领域分类 一级分类 二级分类"
+            "研究内容补充 研究背景 关键技术 额外实验结果"
+            "扩展应用"
+            "结论"
+            "总结"
         )
     )
 
@@ -125,9 +171,13 @@ def create_process_task(markdown_content):
 
 def paper_type_agent():
     return Agent(
-        role="文献领域分类专家",
-        goal="根据文献的研究内容，判断其属于'大模型/AI Agent'还是'室内定位/惯性导航'领域。",
-        backstory="你是一名文献领域分类专家，擅长通过分析文献的研究问题、方法和结论，准确判断其所属的学术领域。",
+        role="生物计算与数据科学文献分类专家",
+        goal="根据文献的研究内容，判断其属于'生物信息学算法'、'生物数据分析'还是'计算生物学建模'领域，并进一步细化到具体研究方向，"
+             "如机器学习、序列分析、基因比对、结构预测、算法开发、深度学习、大模型、数据处理、单细胞数据注释工具、单细胞多组学分析、"
+             "空间转录组数据分析、统计分析、多组学整合（基因组、转录组、蛋白质组、代谢组、表观组等）、实验数据挖掘、数学建模、系统生物学、"
+             "计算模拟、网络分析和生物物理建模。",
+        backstory="你是一名精通生物学与计算机算法交叉领域的专家，擅长分析文献的研究问题、数据类型、计算方法和生物学背景，"
+                  "从而准确判断其所属的学术领域。你不仅能区分生物信息学算法、生物数据分析和计算生物学建模，还能根据具体研究内容，将文献分类到更具体的方向。",
         allow_delegation=False,
         verbose=True,
         llm=llm,
@@ -136,16 +186,14 @@ def paper_type_agent():
 def create_paper_type_task(content):
     return Task(
         description=(
-            f"请阅读以下论文内容，分析其研究问题、方法和结论，判断该论文属于'大模型/AI Agent'领域还是'室内定位/惯性导航'领域。"
+            f"请阅读以下论文内容，分析其研究问题、方法和结论，判断该论文属于'生物信息学算法'、'生物数据分析'还是'计算生物学建模'领域"
             f"请基于论文的核心研究内容和技术领域进行判断，而不是仅仅依赖于关键词。"
-            f"如果该论文的主要研究内容涉及自然语言处理、生成式模型、人工智能代理、大规模语言模型、检索增强生成（RAG）等，则属于'大模型/AI Agent'领域；"
-            f"如果主要涉及室内定位技术、惯性导航系统、传感器融合、定位算法、惯性测量等，则属于'室内定位/惯性导航'领域。"
             f"如果不属于上述两个领域，请返回'忽略'。"
             f"\n\n论文内容如下：\n\n{content}"
         ),
         agent=paper_type_agent(),
         expected_output=(
-            "请只输出文献类型：'大模型/AI Agent' 或 '室内定位/惯性导航'；"
+            "请只输出文献类型：'生物信息学算法'、'生物数据分析'还是'计算生物学建模'"
             "如果不属于这两种类型，返回 '忽略'。不要输出任何其他内容。"
         )
     )
@@ -198,9 +246,10 @@ def fetch_email_content(mail, email_id):
             logging.info(f"Email ID {email_id} is not from the expected sender.")
             return None
         subject = email_message['Subject']
-        if "新的" not in subject:
-            logging.info(f"Email ID {email_id} subject does not contain '新的'.")
-            return None
+        # 无法根据主题判断
+        # if "新的" not in subject:
+        #     logging.info(f"Email ID {email_id} subject does not contain '新的'.")
+        #     return None
 
         # Check the date
         email_date = parsedate_to_datetime(email_message['Date'])
@@ -226,6 +275,28 @@ def fetch_email_content(mail, email_id):
         return None
 
 
+def normalize_biorxiv_url(url):
+    try:
+        # 移除多余的问号和collection参数
+        url = re.sub(r'\?+collection$', '', url)
+
+        # 检查是否是旧格式的 URL (cgi/content/abstract)
+        if 'cgi/content/abstract' in url:
+            # 提取文章ID
+            match = re.search(r'abstract/(\d{4}\.\d{2}\.\d{2}\.\d+v\d+)', url)
+            if match:
+                article_id = match.group(1)
+                # 构造新格式的 URL
+                new_url = f"https://www.biorxiv.org/content/10.1101/{article_id}.abstract"
+                logging.info(f"Converted bioRxiv URL from {url} to {new_url}")
+                return new_url
+
+        return url
+    except Exception as e:
+        logging.error(f"Error normalizing bioRxiv URL {url}: {e}")
+        return url
+
+
 def get_final_url(input_url):
     try:
         # 提取并解码url参数
@@ -247,16 +318,20 @@ def get_final_url(input_url):
 def extract_urls(content):
     logging.info('Extracting URLs from content')
     soup = BeautifulSoup(content, 'html.parser')
-    urls = [a['href'] for a in soup.find_all('a', href=True, class_='gse_alrt_title') if a['href'].startswith('http')]
+    # 先找到 class 为 view_list 的 div，然后在其中找所有的链接
+    urls = [a['href'] for div in soup.find_all('div', class_='view_list')
+            for a in div.find_all('a', href=True)
+            if a['href'].startswith('http') and a.get_text() == '[PDF]']
 
     # Resolve final URLs for any redirects
-    final_urls = []
-    for url in urls:
-        final_url = get_final_url(url)
-        if final_url:
-            final_urls.append(final_url)
-    
-    return final_urls
+    # final_urls = []
+    # for url in urls:
+    #     # final_url = get_final_url(url)
+    #     final_url = normalize_biorxiv_url(url)
+    #     if final_url:
+    #         final_urls.append(final_url)
+
+    return urls
 
 
 def firecrawl_submit_crawl(url):
@@ -332,14 +407,15 @@ def firecrawl_crawl(url):
 
 
 def process_paper(url):
-    markdown_content = firecrawl_crawl(url)
+    # markdown_content = firecrawl_crawl(url)
+    markdown_content = process_pdf(url)
     logging.info(f"Processing paper markdown_content: {markdown_content}")
-    if markdown_content is not None  and markdown_content['markdown'].strip():
+    if markdown_content is not None and markdown_content.strip():
         
         # 添加类型判断
         crew = Crew(
                 agents=[process_agent()],
-                tasks=[create_process_task(markdown_content['markdown'])],
+            tasks=[create_process_task(markdown_content, url)],
                 share_crew=False,
                 verbose=True
             )
@@ -364,14 +440,7 @@ def process_paper(url):
         # 根据类型设置文件名称
         now = datetime.now()
         now_str = now.strftime("%Y%m%d")
-        if "大模型/AI Agent" in paper_type  :
-            output_file = f"{now_str}_大模型"
-        elif "室内定位/惯性导航" in paper_type :
-            output_file = f"{now_str}_室内定位"
-        else:
-            logging.warning(f"Unrecognized type for paper from URL: {url}")
-            return None
-
+        output_file = f"{now_str}_{paper_type}"
         # Format the final output
         formatted_output = f"""{result} \n\n## 原文链接\n{url} \n\n"""
         return output_file, formatted_output
@@ -418,27 +487,37 @@ def main():
             for line in f.readlines():
                 sucess_urls.append(line.strip())
 
-    count = 0;
+    count = 0
     for url in all_paper_urls:
+        if count == 3:
+            logging.info("强制结束.")
+            break
         if url in sucess_urls:
             logging.info(f"URL: {url} has been processed before.")
             count += 1
             print(f'-----------all size: {len(all_paper_urls)} ;current size: {count}------------------')
             process_size(f'all size: {len(all_paper_urls)} ;current size: {count}')
             continue
-        result = process_paper(url)
+        try:
+            result = process_paper(url)
+        except Exception as e:
+            logging.error(f"Error processing URL: {url}: {e}")
+            continue
         if result:
             output_file, formatted_output = result
             # 判断文件是否存在，如果不存在创建文件增加metadata
             if not os.path.exists(output_file+".md"):
                 with open(output_file+".md", 'w', encoding='utf-8') as f:
-                    f.write(f"--- \nlang: zh-CN \ntitle: {output_file} \ndescription: {output_file} \n--- \n\n")
+                    f.write(f"\n")
             with open(output_file+".md", 'a', encoding='utf-8') as f:
                 f.write(f"{formatted_output}\n\n")
             logging.info(f"Processed and wrote result for URL: {url}")
             # 写入成功的url
             with open(f"{now_str}_urls.txt", 'a', encoding='utf-8') as f:
                 f.write(f"{url}\n")
+            # 写入飞书
+            if result:
+                file_upload(output_file, output_file + ".md")
         else:
             logging.warning(f"Failed to process URL: {url}")
         count += 1

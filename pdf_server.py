@@ -3,8 +3,8 @@ from io import BytesIO
 import fitz
 from PIL import Image as PILImage
 
-from ocr.ocr_server import download_file, image_to_base64, ocr, download_image
-from ocr.oss import upload_to_oss_img
+from ocr_server import download_file, image_to_base64, ocr, download_image
+from oss import upload_to_oss_img
 
 
 def process_pdf(url: str, num_pages: int = 10000) -> str:
