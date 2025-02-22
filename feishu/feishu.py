@@ -7,15 +7,15 @@ import lark_oapi as lark
 from lark_oapi.api.drive.v1 import *
 
 # 生产
-APP_ID = 'cli_a7fd8b0155bad00e'
-APP_SECRET = 'SS0tzsmOWEIh4K12kRgRWerBCboX0Nys'
-FOLDER_TOEKN = 'NJEtfX33llsCttdETMCcbjWUnHf'
+# APP_ID = 'cli_a7fd8b0155bad00e'
+# APP_SECRET = 'SS0tzsmOWEIh4K12kRgRWerBCboX0Nys'
+# FOLDER_TOEKN = 'NJEtfX33llsCttdETMCcbjWUnHf'
 
 
 # 测试
-# APP_ID = 'cli_a67f394dc6f85013'
-# APP_SECRET = '8qXvbS9s2pvOmcqnHG6wdduTkNpR1Vi4'
-# FOLDER_TOEKN = 'O0sfflWz3lySj0dDTugcpif2nDA'
+APP_ID = 'cli_a67f394dc6f85013'
+APP_SECRET = '8qXvbS9s2pvOmcqnHG6wdduTkNpR1Vi4'
+FOLDER_TOEKN = 'O0sfflWz3lySj0dDTugcpif2nDA'
 
 
 def create_file(subject):
