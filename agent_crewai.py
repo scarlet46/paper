@@ -254,10 +254,10 @@ def fetch_email_content(mail, email_id):
         # Check the date
         email_date = parsedate_to_datetime(email_message['Date'])
         now = datetime.now(email_date.tzinfo)
-        if email_date < now - timedelta(days=DAYS_RECENT):
-            logging.info(f"Email ID {email_id} is older than the specified range.")
-            print(f"Email ID {email_id} is older than the specified range.")
-            return None
+        # if email_date < now - timedelta(days=DAYS_RECENT):
+        #     logging.info(f"Email ID {email_id} is older than the specified range.")
+        #     print(f"Email ID {email_id} is older than the specified range.")
+        #     return None
 
         # Extract content from the email
         content = ""
@@ -501,9 +501,9 @@ def main():
             if file_token is None:
                 logging.error("No file token found. Exiting.")
                 break
-            # if count == 3:
-            #     logging.info("强制结束.")
-            #     break
+            if count == 3:
+                logging.info("强制结束.")
+                break
             if url in sucess_urls:
                 logging.info(f"URL: {url} has been processed before.")
                 count += 1
