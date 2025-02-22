@@ -83,14 +83,14 @@ load_dotenv()
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # QQ email IMAP settings----
-IMAP_SERVER = 'imap.qq.com'
-EMAIL_ACCOUNT = '2353050774@qq.com'
-# 授权码
-PASSWORD = 'ftiqtavrpghddjeg'
 # IMAP_SERVER = 'imap.qq.com'
-# EMAIL_ACCOUNT = '105150326@qq.com'
+# EMAIL_ACCOUNT = '2353050774@qq.com'
 # # 授权码
-# PASSWORD = 'smoevzzqpdmkcadd'
+# PASSWORD = 'ftiqtavrpghddjeg'
+IMAP_SERVER = 'imap.qq.com'
+EMAIL_ACCOUNT = '105150326@qq.com'
+# 授权码
+PASSWORD = 'smoevzzqpdmkcadd'
 
 # IMAP_SERVER = 'imap.163.com'
 # EMAIL_ACCOUNT = 'shilu_46@163.com'
@@ -254,10 +254,10 @@ def fetch_email_content(mail, email_id):
         # Check the date
         email_date = parsedate_to_datetime(email_message['Date'])
         now = datetime.now(email_date.tzinfo)
-        # if email_date < now - timedelta(days=DAYS_RECENT):
-        #     logging.info(f"Email ID {email_id} is older than the specified range.")
-        #     print(f"Email ID {email_id} is older than the specified range.")
-        #     return None
+        if email_date < now - timedelta(days=DAYS_RECENT):
+            logging.info(f"Email ID {email_id} is older than the specified range.")
+            print(f"Email ID {email_id} is older than the specified range.")
+            return None
 
         # Extract content from the email
         content = ""
