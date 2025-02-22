@@ -19,7 +19,7 @@ from crewai import Agent, Task, Crew, LLM
 from crewai.telemetry import Telemetry
 from dotenv import load_dotenv
 
-from feishu.feishu import file_upload
+from feishu.feishu import file_upload, create_file
 from pdf_server import process_pdf
 
 os.environ["OTEL_SDK_DISABLED"] = "true"
@@ -268,7 +268,7 @@ def fetch_email_content(mail, email_id):
         else:
             content = decode_content(email_message)
 
-        return content
+        return content, subject
 
     except Exception as e:
         logging.error(f"Error getting email content for email ID: {email_id}: {e}")
@@ -460,25 +460,27 @@ def main():
         logging.info("No emails found or connection failed.")
         return
 
-    all_paper_urls = []
+    email_subject = []
     for email_id in email_ids:
-        content = fetch_email_content(mail, email_id)
-        if content:
-            all_paper_urls.extend(extract_urls(content))
+        result = fetch_email_content(mail, email_id)
+        if result:
+            content, subject = result
+            urls = extract_urls(content)
+            email_subject.append({"subject": subject, "urls": urls})
 
-    #all_paper_urls 去重
-    all_paper_urls = list(set(all_paper_urls))
-    # print size
-    print(f'-----------all size: {len(all_paper_urls)}')
-    # all_paper_urls 写入文件
+    print(f'-----------all size: {len(email_subject)}')
     now = datetime.now()
     now_str = now.strftime("%Y%m%d")
-    with open(f"{now_str}_all_urls.txt", 'w', encoding='utf-8') as f:
-        for url in all_paper_urls:
-            f.write(f"{url}\n")
+    # email_subject 写入文件
+    for item in email_subject:
+        urls = list(set(item.get('urls')))
+        with open(f"{now_str}_all_urls.txt", 'w', encoding='utf-8') as f:
+            f.write(f"{item.get('subject')}\n")
+            for url in urls:
+                f.write(f"{url}\n")
 
-    # 根据今天的日期获取对应的文件，读取文件内容，返回一个数组 对应元素是Url
-    # 读取文件内容
+    # # 根据今天的日期获取对应的文件，读取文件内容，返回一个数组 对应元素是Url
+    # # 读取文件内容
     sucess_urls = []
     now = datetime.now()
     now_str = now.strftime("%Y%m%d")
@@ -488,42 +490,52 @@ def main():
                 sucess_urls.append(line.strip())
 
     count = 0
-    for url in all_paper_urls:
-        if count == 3:
-            logging.info("强制结束.")
-            break
-        if url in sucess_urls:
-            logging.info(f"URL: {url} has been processed before.")
+
+    # 处理逻辑
+    for item in email_subject:
+        # 创建文件夹
+        all_paper_urls = item.get('urls')
+        subject = item.get('subject')
+        file_token = create_file(subject)
+        for url in all_paper_urls:
+            if file_token is None:
+                logging.error("No file token found. Exiting.")
+                break
+            if count == 3:
+                logging.info("强制结束.")
+                break
+            if url in sucess_urls:
+                logging.info(f"URL: {url} has been processed before.")
+                count += 1
+                print(f'-----------all size: {len(all_paper_urls)} ;current size: {count}------------------')
+                process_size(f'all size: {len(all_paper_urls)} ;current size: {count}')
+                continue
+            try:
+                result = process_paper(url)
+            except Exception as e:
+                logging.error(f"Error processing URL: {url}: {e}")
+                continue
+            if result:
+                output_file, formatted_output = result
+                # 判断文件是否存在，如果不存在创建文件增加metadata
+                if not os.path.exists(output_file + ".md"):
+                    with open(output_file + ".md", 'w', encoding='utf-8') as f:
+                        f.write(f"\n")
+                with open(output_file + ".md", 'a', encoding='utf-8') as f:
+                    f.write(f"{formatted_output}\n\n")
+                logging.info(f"Processed and wrote result for URL: {url}")
+                # 写入成功的url
+                with open(f"{now_str}_urls.txt", 'a', encoding='utf-8') as f:
+                    f.write(f"{url}\n")
+                # 写入飞书
+                if result:
+                    file_upload(file_token, output_file + ".md")
+            else:
+                logging.warning(f"Failed to process URL: {url}")
             count += 1
+            # print all and current count
             print(f'-----------all size: {len(all_paper_urls)} ;current size: {count}------------------')
             process_size(f'all size: {len(all_paper_urls)} ;current size: {count}')
-            continue
-        try:
-            result = process_paper(url)
-        except Exception as e:
-            logging.error(f"Error processing URL: {url}: {e}")
-            continue
-        if result:
-            output_file, formatted_output = result
-            # 判断文件是否存在，如果不存在创建文件增加metadata
-            if not os.path.exists(output_file+".md"):
-                with open(output_file+".md", 'w', encoding='utf-8') as f:
-                    f.write(f"\n")
-            with open(output_file+".md", 'a', encoding='utf-8') as f:
-                f.write(f"{formatted_output}\n\n")
-            logging.info(f"Processed and wrote result for URL: {url}")
-            # 写入成功的url
-            with open(f"{now_str}_urls.txt", 'a', encoding='utf-8') as f:
-                f.write(f"{url}\n")
-            # 写入飞书
-            if result:
-                file_upload(output_file, output_file + ".md")
-        else:
-            logging.warning(f"Failed to process URL: {url}")
-        count += 1
-        # print all and current count
-        print(f'-----------all size: {len(all_paper_urls)} ;current size: {count}------------------')
-        process_size(f'all size: {len(all_paper_urls)} ;current size: {count}')
 
     logging.info("All papers processed.")
             
