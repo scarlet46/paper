@@ -20,6 +20,7 @@ from crewai.telemetry import Telemetry
 from dotenv import load_dotenv
 
 from feishu.feishu import file_upload, create_file
+from feishu.feishu_webhook import send_feishu_message
 from pdf_server import process_pdf
 
 os.environ["OTEL_SDK_DISABLED"] = "true"
@@ -64,16 +65,22 @@ for attr in dir(Telemetry):
 
 
 # 设置 Ollama API 环境变量
-# os.environ["OLLAMA_API_KEY"] = "your_ollama_api_key"
-Model = "gpt-4o-mini"
-os.environ["OPENAI_API_KEY"] = "sk-tA4X88vrZDn2RV5GDe54Ec3743744d7eBaB8F8Ae8a73F1Cf"
-llm = LLM(model=Model, base_url="https://api.fast-tunnel.one/v1",
-          api_key="sk-tA4X88vrZDn2RV5GDe54Ec3743744d7eBaB8F8Ae8a73F1Cf")
+# Model = "gpt-4o-mini"
+# os.environ["OPENAI_API_KEY"] = "sk-tA4X88vrZDn2RV5GDe54Ec3743744d7eBaB8F8Ae8a73F1Cf"
+# llm = LLM(model=Model, base_url="https://api.fast-tunnel.one/v1",
+#           api_key="sk-tA4X88vrZDn2RV5GDe54Ec3743744d7eBaB8F8Ae8a73F1Cf")
 
 # Model = "deepseek-chat"
 # llm = LLM(model=Model, base_url="https://api.deepseek.com/v1",
 #           api_key="sk-5346b4837c81477592d7503a3de034ec")
 # os.environ["OPENAI_API_KEY"] = "sk-tA4X88vrZDn2RV5GDe54Ec3743744d7eBaB8F8Ae8a73F1Cf"
+
+Model = "volcengine/deepseek-v3-241226"
+llm = LLM(
+    model=Model,
+    base_url="https://ark.cn-beijing.volces.com/api/v3",
+    api_key="74cfeb2a-831e-477d-91cd-9d60fd18405d"
+)
 
 os.environ['CREWAI_TELEMETRY_OPT_OUT'] = 'FALSE'
 # Load environment variables
@@ -318,20 +325,18 @@ def get_final_url(input_url):
 def extract_urls(content):
     logging.info('Extracting URLs from content')
     soup = BeautifulSoup(content, 'html.parser')
-    # 先找到 class 为 view_list 的 div，然后在其中找所有的链接
-    urls = [a['href'] for div in soup.find_all('div', class_='view_list')
-            for a in div.find_all('a', href=True)
-            if a['href'].startswith('http') and a.get_text() == '[PDF]']
+    # 提取标题
+    titles = [div.get_text().strip()
+              for div in soup.find_all('div', class_='citation_title')]
 
-    # Resolve final URLs for any redirects
-    # final_urls = []
-    # for url in urls:
-    #     # final_url = get_final_url(url)
-    #     final_url = normalize_biorxiv_url(url)
-    #     if final_url:
-    #         final_urls.append(final_url)
+    # 提取PDF链接
+    pdf_urls = [a['href']
+                for div in soup.find_all('div', class_='view_list')
+                for a in div.find_all('a', href=True)
+                if a['href'].startswith('http') and a.get_text() == '[PDF]']
 
-    return urls
+    # 将标题和URL组合成字典列表
+    return [{"title": title, "url": url} for title, url in zip(titles, pdf_urls)]
 
 
 def firecrawl_submit_crawl(url):
@@ -465,22 +470,23 @@ def main():
         result = fetch_email_content(mail, email_id)
         if result:
             content, subject = result
-            urls = extract_urls(content)
-            email_subject.append({"subject": subject, "urls": urls})
+            url_title = extract_urls(content)
+            email_subject.append({"subject": subject, "urls": url_title})
 
     print(f'-----------all size: {len(email_subject)}')
     now = datetime.now()
     now_str = now.strftime("%Y%m%d")
     # email_subject 写入文件
     for item in email_subject:
-        urls = list(set(item.get('urls')))
+        urls = [entry['url'] for entry in item.get('urls', [])]
+        urls = list(set(urls))
         with open(f"{now_str}_all_urls.txt", 'w', encoding='utf-8') as f:
             f.write(f"{item.get('subject')}\n")
             for url in urls:
                 f.write(f"{url}\n")
 
-    # # 根据今天的日期获取对应的文件，读取文件内容，返回一个数组 对应元素是Url
-    # # 读取文件内容
+    # 根据今天的日期获取对应的文件，读取文件内容，返回一个数组 对应元素是Url
+    # 读取文件内容
     sucess_urls = []
     now = datetime.now()
     now_str = now.strftime("%Y%m%d")
@@ -497,13 +503,17 @@ def main():
         all_paper_urls = item.get('urls')
         subject = item.get('subject')
         file_token = create_file(subject)
-        for url in all_paper_urls:
+        send_feishu_message(
+            f"开始执行主题为:{subject}的邮件,总共{len(all_paper_urls)}条数据,获取到文件夹token:{file_token}")
+        for url_item in all_paper_urls:
+            url = url_item['url']
+            file_title = url_item['title']
             if file_token is None:
                 logging.error("No file token found. Exiting.")
                 break
-            # if count == 3:
-            #     logging.info("强制结束.")
-            #     break
+            if count == 3:
+                logging.info("强制结束.")
+                break
             if url in sucess_urls:
                 logging.info(f"URL: {url} has been processed before.")
                 count += 1
@@ -517,11 +527,12 @@ def main():
                 continue
             if result:
                 output_file, formatted_output = result
+                file_name = output_file + "_" + file_title + ".md"
                 # 判断文件是否存在，如果不存在创建文件增加metadata
-                if not os.path.exists(output_file + ".md"):
-                    with open(output_file + ".md", 'w', encoding='utf-8') as f:
+                if not os.path.exists(file_name):
+                    with open(file_name, 'w', encoding='utf-8') as f:
                         f.write(f"\n")
-                with open(output_file + ".md", 'a', encoding='utf-8') as f:
+                with open(file_name, 'a', encoding='utf-8') as f:
                     f.write(f"{formatted_output}\n\n")
                 logging.info(f"Processed and wrote result for URL: {url}")
                 # 写入成功的url
@@ -529,13 +540,15 @@ def main():
                     f.write(f"{url}\n")
                 # 写入飞书
                 if result:
-                    file_upload(file_token, output_file + ".md")
+                    file_upload(file_token, file_name)
             else:
                 logging.warning(f"Failed to process URL: {url}")
             count += 1
             # print all and current count
             print(f'-----------all size: {len(all_paper_urls)} ;current size: {count}------------------')
             process_size(f'all size: {len(all_paper_urls)} ;current size: {count}')
+        send_feishu_message(
+            f"结束执行主题为:{subject}的邮件,总共{len(all_paper_urls)}条数据,获取到文件夹token:{file_token}")
 
     logging.info("All papers processed.")
             
