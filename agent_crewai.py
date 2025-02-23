@@ -501,9 +501,9 @@ def main():
             if file_token is None:
                 logging.error("No file token found. Exiting.")
                 break
-            if count == 3:
-                logging.info("强制结束.")
-                break
+            # if count == 3:
+            #     logging.info("强制结束.")
+            #     break
             if url in sucess_urls:
                 logging.info(f"URL: {url} has been processed before.")
                 count += 1
