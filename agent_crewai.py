@@ -497,58 +497,62 @@ def main():
 
     count = 0
 
-    # # 处理逻辑
-    # for item in email_subject:
-    #     # 创建文件夹
-    #     all_paper_urls = item.get('urls')
-    #     subject = item.get('subject')
-    #     file_token = create_file(subject)
-    #     send_feishu_message(
-    #         f"开始执行主题为:{subject}的邮件,总共{len(all_paper_urls)}条数据,获取到文件夹token:{file_token}")
-    #     for url_item in all_paper_urls:
-    #         url = url_item['url']
-    #         file_title = url_item['title']
-    #         if file_token is None:
-    #             logging.error("No file token found. Exiting.")
-    #             break
-    #         # if count == 3:
-    #         #     logging.info("强制结束.")
-    #         #     break
-    #         if url in sucess_urls:
-    #             logging.info(f"URL: {url} has been processed before.")
-    #             count += 1
-    #             print(f'-----------all size: {len(all_paper_urls)} ;current size: {count}------------------')
-    #             process_size(f'all size: {len(all_paper_urls)} ;current size: {count}')
-    #             continue
-    #         try:
-    #             result = process_paper(url)
-    #         except Exception as e:
-    #             logging.error(f"Error processing URL: {url}: {e}")
-    #             continue
-    #         if result:
-    #             output_file, formatted_output = result
-    #             file_name = output_file + "_" + file_title + ".md"
-    #             # 判断文件是否存在，如果不存在创建文件增加metadata
-    #             if not os.path.exists(file_name):
-    #                 with open(file_name, 'w', encoding='utf-8') as f:
-    #                     f.write(f"\n")
-    #             with open(file_name, 'a', encoding='utf-8') as f:
-    #                 f.write(f"{formatted_output}\n\n")
-    #             logging.info(f"Processed and wrote result for URL: {url}")
-    #             # 写入成功的url
-    #             with open(f"{now_str}_urls.txt", 'a', encoding='utf-8') as f:
-    #                 f.write(f"{url}\n")
-    #             # 写入飞书
-    #             if result:
-    #                 file_upload(file_token, file_name)
-    #         else:
-    #             logging.warning(f"Failed to process URL: {url}")
-    #         count += 1
-    #         # print all and current count
-    #         print(f'-----------all size: {len(all_paper_urls)} ;current size: {count}------------------')
-    #         process_size(f'all size: {len(all_paper_urls)} ;current size: {count}')
-    #     send_feishu_message(
-    #         f"结束执行主题为:{subject}的邮件,总共{len(all_paper_urls)}条数据,获取到文件夹token:{file_token}")
+    # 处理逻辑
+    for item in email_subject:
+        # 创建文件夹
+        all_paper_urls = item.get('urls')
+        subject = item.get('subject')
+        file_token = create_file(subject)
+        send_feishu_message(
+            f"开始执行主题为:{subject}的邮件,总共{len(all_paper_urls)}条数据,获取到文件夹token:{file_token}")
+        for url_item in all_paper_urls:
+            url = url_item['url']
+            file_title = url_item['title']
+            if file_token is None:
+                logging.error("No file token found. Exiting.")
+                break
+            # if count == 3:
+            #     logging.info("强制结束.")
+            #     break
+            if url in sucess_urls:
+                logging.info(f"URL: {url} has been processed before.")
+                count += 1
+                print(f'-----------all size: {len(all_paper_urls)} ;current size: {count}------------------')
+                process_size(f'all size: {len(all_paper_urls)} ;current size: {count}')
+                send_feishu_message(
+                    f"URL: {url} has been processed before.")
+                continue
+            try:
+                result = process_paper(url)
+            except Exception as e:
+                send_feishu_message(
+                    f":Error processing URL: {url}: {e}")
+                logging.error(f"Error processing URL: {url}: {e}")
+                continue
+            if result:
+                output_file, formatted_output = result
+                file_name = output_file + "_" + file_title + ".md"
+                # 判断文件是否存在，如果不存在创建文件增加metadata
+                if not os.path.exists(file_name):
+                    with open(file_name, 'w', encoding='utf-8') as f:
+                        f.write(f"\n")
+                with open(file_name, 'a', encoding='utf-8') as f:
+                    f.write(f"{formatted_output}\n\n")
+                logging.info(f"Processed and wrote result for URL: {url}")
+                # 写入成功的url
+                with open(f"{now_str}_urls.txt", 'a', encoding='utf-8') as f:
+                    f.write(f"{url}\n")
+                # 写入飞书
+                if result:
+                    file_upload(file_token, file_name)
+            else:
+                logging.warning(f"Failed to process URL: {url}")
+            count += 1
+            # print all and current count
+            print(f'-----------all size: {len(all_paper_urls)} ;current size: {count}------------------')
+            process_size(f'all size: {len(all_paper_urls)} ;current size: {count}')
+        send_feishu_message(
+            f"结束执行主题为:{subject}的邮件,总共{len(all_paper_urls)}条数据,获取到文件夹token:{file_token}")
 
     logging.info("All papers processed.")
             
