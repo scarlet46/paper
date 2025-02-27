@@ -510,6 +510,8 @@ def main():
             file_title = url_item['title']
             if file_token is None:
                 logging.error("No file token found. Exiting.")
+                send_feishu_message(
+                    f"No file token found. Exiting.")
                 break
             # if count == 3:
             #     logging.info("强制结束.")
@@ -526,25 +528,31 @@ def main():
                 result = process_paper(url)
             except Exception as e:
                 send_feishu_message(
-                    f":Error processing URL: {url}: {e}")
+                    f":异常:解析URL解析失败: {url}: {e}")
                 logging.error(f"Error processing URL: {url}: {e}")
                 continue
             if result:
-                output_file, formatted_output = result
-                file_name = output_file + "_" + file_title + ".md"
-                # 判断文件是否存在，如果不存在创建文件增加metadata
-                if not os.path.exists(file_name):
-                    with open(file_name, 'w', encoding='utf-8') as f:
-                        f.write(f"\n")
-                with open(file_name, 'a', encoding='utf-8') as f:
-                    f.write(f"{formatted_output}\n\n")
-                logging.info(f"Processed and wrote result for URL: {url}")
-                # 写入成功的url
-                with open(f"{now_str}_urls.txt", 'a', encoding='utf-8') as f:
-                    f.write(f"{url}\n")
-                # 写入飞书
-                if result:
-                    file_upload(file_token, file_name)
+                try:
+                    output_file, formatted_output = result
+                    file_name = output_file + "_" + file_title + ".md"
+                    # 判断文件是否存在，如果不存在创建文件增加metadata
+                    if not os.path.exists(file_name):
+                        with open(file_name, 'w', encoding='utf-8') as f:
+                            f.write(f"\n")
+                    with open(file_name, 'a', encoding='utf-8') as f:
+                        f.write(f"{formatted_output}\n\n")
+                    logging.info(f"Processed and wrote result for URL: {url}")
+                    # 写入成功的url
+                    with open(f"{now_str}_urls.txt", 'a', encoding='utf-8') as f:
+                        f.write(f"{url}\n")
+                    # 写入飞书
+                    if result:
+                        file_upload(file_token, file_name)
+                except Exception as e:
+                    send_feishu_message(
+                        f":异常:处理文件结果={result}上传飞书异常: {url}: {e}")
+                    logging.error(f"Error uploading URL: {url}: {e}")
+
             else:
                 logging.warning(f"Failed to process URL: {url}")
             count += 1
