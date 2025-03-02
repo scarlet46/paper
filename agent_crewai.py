@@ -364,6 +364,7 @@ def main():
             continue
         subject = item.get('subject')
         email_date = item.get('email_date')
+        email_date = email_date.strftime("%Y-%m-%d_%H-%M-%S")  # 转换为字符串
         email_date = sanitize_file_name(email_date)
         file_token = create_file(subject, email_date)
         send_feishu_message(

@@ -173,21 +173,32 @@ def process_paper(url):
 
 
 import re
+import os
 
 
-def sanitize_file_name(name, max_length=100):
+def sanitize_file_name(name, max_length=200):
     """
-    清理文件名，替换非法字符和空格，限制最大长度。
+    清理文件名，替换非法字符和空格，限制最大长度，同时保留文件扩展名。
 
     :param name: 原始文件名
     :param max_length: 文件名最大长度
     :return: 清理后的文件名
     """
+    # 分离文件名和扩展名
+    base_name, ext = os.path.splitext(name)
+
     # 替换非法字符和空格为下划线
-    sanitized = re.sub(r'[\/\\\:\*\?\"\<\>\|\s]', '_', name)
-    # 去掉首尾多余的下划线
-    sanitized = sanitized.strip('_')
-    # 限制文件名长度
-    if len(sanitized) > max_length:
-        sanitized = sanitized[:max_length]
-    return sanitized
+    sanitized_base = re.sub(r'[\/\\\:\*\?\"\<\>\|\s]', '_', base_name)
+    sanitized_base = sanitized_base.strip('_')  # 去掉首尾多余的下划线
+
+    # 计算允许的文件名主体长度（减去扩展名长度）
+    max_base_length = max_length - len(ext)
+
+    # 截断文件名主体部分
+    if len(sanitized_base) > max_base_length:
+        sanitized_base = sanitized_base[:max_base_length]
+
+    # 拼接截断后的文件名和扩展名
+    sanitized_name = sanitized_base + ext
+    return sanitized_name
+
