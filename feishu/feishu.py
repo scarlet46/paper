@@ -18,7 +18,7 @@ FOLDER_TOEKN = 'NJEtfX33llsCttdETMCcbjWUnHf'
 # FOLDER_TOEKN = 'O0sfflWz3lySj0dDTugcpif2nDA'
 
 
-def create_file(subject):
+def create_file(subject, email_date):
     # 创建client
     client = lark.Client.builder() \
         .app_id(APP_ID) \
@@ -29,7 +29,7 @@ def create_file(subject):
     # 构造请求对象
     now = datetime.now()
     now_str = now.strftime("%Y%m%d")
-    output_file = f"{now_str}_{subject}"
+    output_file = f"{email_date}_{subject}"
     request: CreateFolderFileRequest = CreateFolderFileRequest.builder() \
         .request_body(CreateFolderFileRequestBody.builder()
                       .name(output_file)
