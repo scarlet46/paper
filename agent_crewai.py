@@ -431,7 +431,7 @@ def main():
         send_feishu_message(
             f"结束执行主题为:{subject}的邮件,总共{len(all_paper_urls)}条数据,获取到文件夹token:{file_token}")
 
-    logging.info("All papers processed.")
+    logging.info("All papers processed. ")
             
 
 if __name__ == "__main__":
