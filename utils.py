@@ -4,6 +4,8 @@ from datetime import datetime
 from crewai import Crew, Agent, LLM, Task
 
 from pdf_server import process_pdf
+import json
+from hashlib import md5 as hash
 
 # 设置 Ollama API 环境变量
 # Model = "gpt-4o-mini"
