@@ -92,7 +92,7 @@ FIRECRAWL_API_URL = 'http://140.143.139.183:3002/v1'
 
 # 监控发件人邮箱地址
 SENDER_EMAIL = 'cshljnls-mailer@alerts.highwire.org'
-DAYS_RECENT = 3
+DAYS_RECENT = 7
 
 
 
