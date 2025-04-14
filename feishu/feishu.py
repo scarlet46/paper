@@ -9,7 +9,7 @@ from lark_oapi.api.drive.v1 import *
 # 生产
 APP_ID = 'cli_a7fd8b0155bad00e'
 APP_SECRET = 'SS0tzsmOWEIh4K12kRgRWerBCboX0Nys'
-FOLDER_TOEKN = 'SUChfJH4dly4p6d7o7Mc3gB9nlc'
+FOLDER_TOEKN = 'NJEtfX33llsCttdETMCcbjWUnHf'
 
 
 # 测试
