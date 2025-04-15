@@ -1,25 +1,13 @@
-def debug_redirects(url):
-    import requests
-    import logging
+import requests
 
-    # 设置详细日志
-    logging.basicConfig(level=logging.DEBUG)
-    logger = logging.getLogger("urllib3")
-    logger.setLevel(logging.DEBUG)
+headers = {
+    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+    'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+    'Accept-Language': 'en-US,en;q=0.5',
+    'Connection': 'keep-alive',
+    'Upgrade-Insecure-Requests': '1',
+}
 
-    try:
-        response = requests.get(url, allow_redirects=True)
-        print(f"Final URL: {response.url}")
-        print(f"Status code: {response.status_code}")
-        print(f"Redirect history: {[r.url for r in response.history]}")
-        print(f"Response headers: {dict(response.headers)}")
-        return response.url
-    except Exception as e:
-        print(f"Error: {str(e)}")
-        import traceback
-        traceback.print_exc()
-        return None
-
-if __name__ == '__main__':
-    url = 'https://www.biorxiv.org/cgi/reprint/2023.11.27.568912v2??collection'
-    print(debug_redirects(url))
+response = requests.get('https://www.biorxiv.org/cgi/reprint/2023.11.27.568912v2', headers=headers)
+print(f"Status code: {response.status_code}")
+print(f"Status code: {response.url}")
