@@ -372,9 +372,10 @@ def main():
             #     logging.info("强制结束.")
             #     break
             if url in sucess_urls:
-                # 将 HTTP URL 替换为 HTTPS URL
-                if url.startswith('http:'):
-                    url = url.replace('http:', 'https:', 1)
+                import requests
+                response = requests.get(url, allow_redirects=True)
+                url = response.url
+                logging.info(f"重定向 URL: {url}")
                 logging.info(f"URL: {url} has been processed before.")
                 count += 1
                 print(f'-----------all size: {len(all_paper_urls)} ;current size: {count}------------------')
