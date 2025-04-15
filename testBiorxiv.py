@@ -1,12 +1,25 @@
-import requests
+def debug_redirects(url):
+    import requests
+    import logging
 
-# 使用与成功的 curl 请求完全相同的头信息
-headers = {
-    'User-Agent': 'curl/7.68.0',  # 使用您系统上 curl 的实际 User-Agent
-    'Accept': '*/*',  # curl 默认的 Accept 头
-    # 添加 curl 请求中的其他头信息
-}
+    # 设置详细日志
+    logging.basicConfig(level=logging.DEBUG)
+    logger = logging.getLogger("urllib3")
+    logger.setLevel(logging.DEBUG)
 
-response = requests.get('https://www.biorxiv.org/content/10.1101/2023.11.27.568912v2', headers=headers)
-print(f"Status code: {response.status_code}")
-print(f"Status code: {response.url}")
+    try:
+        response = requests.get(url, allow_redirects=True)
+        print(f"Final URL: {response.url}")
+        print(f"Status code: {response.status_code}")
+        print(f"Redirect history: {[r.url for r in response.history]}")
+        print(f"Response headers: {dict(response.headers)}")
+        return response.url
+    except Exception as e:
+        print(f"Error: {str(e)}")
+        import traceback
+        traceback.print_exc()
+        return None
+
+if __name__ == '__main__':
+    url = 'https://www.biorxiv.org/cgi/reprint/2023.11.27.568912v2??collection'
+    print(debug_redirects(url))
