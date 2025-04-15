@@ -403,9 +403,9 @@ def main():
             file_title = url_item['title']
             # 修改循环控制逻辑
             if file_token is None:
-                logging.error("No file token found. Continuing to next item.")
+                logging.error("No file token found. Skipping current email item.")
                 send_feishu_message(f"创建文件夹失败，跳过当前邮件项: {subject}")
-                continue  # 修改break为continue
+                continue  # 跳过当前邮件项继续处理下一个
 
             if url in sucess_urls:
                 logging.info(f"URL: {url} has been processed before.")
