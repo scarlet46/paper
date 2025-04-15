@@ -100,15 +100,6 @@ os.environ['CREWAI_DISABLE_TELEMETRY'] = 'true'
 
 
 
-
-
-
-
-
-
-
-
-
 @backoff.on_exception(backoff.expo, imaplib.IMAP4.error, max_tries=5)
 def get_emails():
     try:
@@ -410,14 +401,12 @@ def main():
         for url_item in all_paper_urls:
             url = url_item['url']
             file_title = url_item['title']
+            # 修改循环控制逻辑
             if file_token is None:
-                logging.error("No file token found. Exiting.")
-                send_feishu_message(
-                    f"No file token found. Exiting.")
-                break
-            # if count == 3:
-            #     logging.info("强制结束.")
-            #     break
+                logging.error("No file token found. Continuing to next item.")
+                send_feishu_message(f"创建文件夹失败，跳过当前邮件项: {subject}")
+                continue  # 修改break为continue
+
             if url in sucess_urls:
                 logging.info(f"URL: {url} has been processed before.")
                 count += 1
@@ -472,5 +461,8 @@ def main():
     logging.info("All papers processed. ")
             
 
+    # 添加最终完成通知
+    send_feishu_message("所有论文处理完成")
+    logging.info("All papers processed and notifications sent.")
 if __name__ == "__main__":
     main()
