@@ -186,8 +186,10 @@ def fetch_email_content(mail, email_id):
 
 def normalize_biorxiv_url(url):
     try:
-        # 移除多余的问号和collection参数
-        url = re.sub(r'\?+collection$', '', url)
+         # 修正参数分隔符（将双问号替换为单问号）
+        url = re.sub(r'\?+', '?', url)
+        # 移除collection参数
+        url = re.sub(r'[\?&]collection', '', url)
 
         # 检查是否是旧格式的 URL (cgi/content/abstract)
         if 'cgi/content/abstract' in url:
@@ -227,6 +229,13 @@ def get_final_url(input_url):
 def extract_urls(content):
     logging.info('Extracting URLs from content')
     soup = BeautifulSoup(content, 'html.parser')
+    # 新增URL规范化处理
+    pdf_urls = [
+        normalize_biorxiv_url(a['href'])  # 清理URL格式
+        for div in soup.find_all('div', class_='view_list')
+        for a in div.find_all('a', href=True)
+        if a['href'].startswith('http') and a.get_text() == '[PDF]'
+    ]
     # 提取标题
     titles = [div.get_text().strip()
               for div in soup.find_all('div', class_='citation_title')]
@@ -242,14 +251,19 @@ def extract_urls(content):
 
 
 def firecrawl_submit_crawl(url):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
+        "Referer": "https://www.biorxiv.org/",
+        'Content-Type': 'application/json'
+    }
     logging.info(f"Submitting crawl job for URL: {url}")
     print(f"Submitting crawl job for URL: {url}")
     try:
         response = requests.post(
             f'{FIRECRAWL_API_URL}/crawl',
-            headers={
-                'Content-Type': 'application/json',
-            },
+           headers=headers,  # 使用合并后的请求头
             json={
                 'url': url,
                 'limit': 1,
