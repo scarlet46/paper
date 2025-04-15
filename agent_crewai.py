@@ -207,7 +207,6 @@ def normalize_biorxiv_url(url):
             else:
                 return url
         return url
-        return url)
 
         # 检查是否是旧格式的 URL (cgi/content/abstract)
         if 'cgi/content/abstract' in url:
@@ -247,13 +246,19 @@ def get_final_url(input_url):
 def extract_urls(content):
     logging.info('Extracting URLs from content')
     soup = BeautifulSoup(content, 'html.parser')
-    # 新增URL规范化处理
-    pdf_urls = [
-        normalize_biorxiv_url(a['href'])  # 清理URL格式
-        for div in soup.find_all('div', class_='view_list')
-        for a in div.find_all('a', href=True)
-        if a['href'].startswith('http') and a.get_text() == '[PDF]'
-    ]
+    
+    url_data = []
+    for div in soup.find_all('div', class_='highwire-citation'):
+        title_div = div.find('div', class_='citation_title')
+        article_link = div.find('a', href=re.compile(r'^/content/10\.1101/\d{4}\.\d{2}\.\d{2}\.\d+v\d+$'))
+
+        if title_div and article_link:
+            title = title_div.get_text(strip=True)
+            href = article_link['href']
+            full_url = normalize_biorxiv_url(f'https://www.biorxiv.org{href}')
+            url_data.append({"title": title, "url": full_url})
+
+    return url_data
 
     # 提取标题
     titles = [div.get_text().strip()
