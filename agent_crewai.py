@@ -92,20 +92,11 @@ FIRECRAWL_API_URL = 'http://140.143.139.183:3002/v1'
 
 # 监控发件人邮箱地址
 SENDER_EMAIL = 'cshljnls-mailer@alerts.highwire.org'
-DAYS_RECENT = 3
+DAYS_RECENT = 7
 
 
 
 os.environ['CREWAI_DISABLE_TELEMETRY'] = 'true'
-
-
-
-
-
-
-
-
-
 
 
 
@@ -186,8 +177,27 @@ def fetch_email_content(mail, email_id):
 
 def normalize_biorxiv_url(url):
     try:
-        # 移除多余的问号和collection参数
-        url = re.sub(r'\?+collection$', '', url)
+        # 标准化URL格式
+        url = re.sub(r'(?<!\?)https?:\/\/', '', url)  # 移除可能存在的重复协议
+        url = re.sub(r'\?+', '?', url)
+        url = re.sub(r'[\?&](collection|version|type|v)=[^&]*', '', url)
+        url = re.sub(r'\?&+', '?', url)
+        url = re.sub(r'\?$', '', url)
+        
+        # 处理旧格式URL
+        if 'cgi/content/abstract' in url:
+            match = re.search(r'abstract/(\d{4}\.\d{2}\.\d{2}\.\d+v\d+)', url)
+            if match:
+                article_id = match.group(1)
+                return f"https://www.biorxiv.org/content/10.1101/{article_id}.full-text"
+        
+        # 确保最终是PDF链接
+        if 'content' in url:
+            if not url.endswith('.pdf'):
+                return f"{url}.pdf"
+            else:
+                return url
+        return url
 
         # 检查是否是旧格式的 URL (cgi/content/abstract)
         if 'cgi/content/abstract' in url:
@@ -227,29 +237,48 @@ def get_final_url(input_url):
 def extract_urls(content):
     logging.info('Extracting URLs from content')
     soup = BeautifulSoup(content, 'html.parser')
+    
+    url_data = []
+    for div in soup.find_all('div', class_='highwire-citation'):
+        title_div = div.find('div', class_='citation_title')
+        article_link = div.find('a', href=re.compile(r'^/content/10\.1101/\d{4}\.\d{2}\.\d{2}\.\d+v\d+$'))
+
+        if title_div and article_link:
+            title = title_div.get_text(strip=True)
+            href = article_link['href']
+            full_url = normalize_biorxiv_url(f'https://www.biorxiv.org{href}')
+            url_data.append({"title": title, "url": full_url})
+
+    return url_data
+
     # 提取标题
     titles = [div.get_text().strip()
               for div in soup.find_all('div', class_='citation_title')]
-
-    # 提取PDF链接
-    pdf_urls = [a['href']
-                for div in soup.find_all('div', class_='view_list')
-                for a in div.find_all('a', href=True)
-                if a['href'].startswith('http') and a.get_text() == '[PDF]']
 
     # 将标题和URL组合成字典列表
     return [{"title": title, "url": url} for title, url in zip(titles, pdf_urls)]
 
 
 def firecrawl_submit_crawl(url):
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.6422.76 Safari/537.36",
+        "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
+        "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
+        "Referer": "https://www.biorxiv.org/",
+        "Origin": "https://www.biorxiv.org",
+        "DNT": "1",
+        "Connection": "keep-alive",
+        "Cache-Control": "max-age=0",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Upgrade-Insecure-Requests": "1",
+        'Content-Type': 'application/json'
+    }
     logging.info(f"Submitting crawl job for URL: {url}")
     print(f"Submitting crawl job for URL: {url}")
     try:
         response = requests.post(
             f'{FIRECRAWL_API_URL}/crawl',
-            headers={
-                'Content-Type': 'application/json',
-            },
+           headers=headers,  # 使用合并后的请求头
             json={
                 'url': url,
                 'limit': 1,
@@ -372,14 +401,12 @@ def main():
         for url_item in all_paper_urls:
             url = url_item['url']
             file_title = url_item['title']
+            # 修改循环控制逻辑
             if file_token is None:
-                logging.error("No file token found. Exiting.")
-                send_feishu_message(
-                    f"No file token found. Exiting.")
-                break
-            # if count == 3:
-            #     logging.info("强制结束.")
-            #     break
+                logging.error("No file token found. Skipping current email item.")
+                send_feishu_message(f"创建文件夹失败，跳过当前邮件项: {subject}")
+                continue  # 跳过当前邮件项继续处理下一个
+
             if url in sucess_urls:
                 logging.info(f"URL: {url} has been processed before.")
                 count += 1
@@ -434,5 +461,8 @@ def main():
     logging.info("All papers processed. ")
             
 
+    # 添加最终完成通知
+    send_feishu_message("所有论文处理完成")
+    logging.info("All papers processed and notifications sent.")
 if __name__ == "__main__":
     main()
