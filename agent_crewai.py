@@ -236,15 +236,10 @@ def extract_urls(content):
         for a in div.find_all('a', href=True)
         if a['href'].startswith('http') and a.get_text() == '[PDF]'
     ]
+
     # 提取标题
     titles = [div.get_text().strip()
               for div in soup.find_all('div', class_='citation_title')]
-
-    # 提取PDF链接
-    pdf_urls = [a['href']
-                for div in soup.find_all('div', class_='view_list')
-                for a in div.find_all('a', href=True)
-                if a['href'].startswith('http') and a.get_text() == '[PDF]']
 
     # 将标题和URL组合成字典列表
     return [{"title": title, "url": url} for title, url in zip(titles, pdf_urls)]
