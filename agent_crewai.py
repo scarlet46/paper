@@ -362,6 +362,10 @@ def main():
             f"开始执行主题为:{subject}的邮件,总共{len(all_paper_urls)}条数据,获取到文件夹token:{file_token}")
         for url_item in all_paper_urls:
             url = url_item['url']
+            import requests
+            response = requests.get(url, allow_redirects=True)
+            url = response.url
+            logging.info(f"重定向 URL: {url}")
             file_title = url_item['title']
             if file_token is None:
                 logging.error("No file token found. Exiting.")
@@ -372,10 +376,6 @@ def main():
             #     logging.info("强制结束.")
             #     break
             if url in sucess_urls:
-                import requests
-                response = requests.get(url, allow_redirects=True)
-                url = response.url
-                logging.info(f"重定向 URL: {url}")
                 logging.info(f"URL: {url} has been processed before.")
                 count += 1
                 print(f'-----------all size: {len(all_paper_urls)} ;current size: {count}------------------')
