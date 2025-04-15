@@ -132,9 +132,6 @@ def process_agent():
 
 
 def process_paper(url):
-    # 将 HTTP URL 替换为 HTTPS URL
-    if url.startswith('http:'):
-        url = url.replace('http:', 'https:', 1)
     # markdown_content = firecrawl_crawl(url)
     markdown_content = process_pdf(url)
     logging.info(f"Processing paper markdown_content: {markdown_content}")
