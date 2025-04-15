@@ -186,10 +186,28 @@ def fetch_email_content(mail, email_id):
 
 def normalize_biorxiv_url(url):
     try:
-         # 修正参数分隔符（将双问号替换为单问号）
+        # 标准化URL格式
+        url = re.sub(r'(?<!\?)https?:\/\/', '', url)  # 移除可能存在的重复协议
         url = re.sub(r'\?+', '?', url)
-        # 移除collection参数
-        url = re.sub(r'[\?&]collection', '', url)
+        url = re.sub(r'[\?&](collection|version|type|v)=[^&]*', '', url)
+        url = re.sub(r'\?&+', '?', url)
+        url = re.sub(r'\?$', '', url)
+        
+        # 处理旧格式URL
+        if 'cgi/content/abstract' in url:
+            match = re.search(r'abstract/(\d{4}\.\d{2}\.\d{2}\.\d+v\d+)', url)
+            if match:
+                article_id = match.group(1)
+                return f"https://www.biorxiv.org/content/10.1101/{article_id}.full-text"
+        
+        # 确保最终是PDF链接
+        if 'content' in url:
+            if not url.endswith('.pdf'):
+                return f"{url}.pdf"
+            else:
+                return url
+        return url
+        return url)
 
         # 检查是否是旧格式的 URL (cgi/content/abstract)
         if 'cgi/content/abstract' in url:
@@ -247,10 +265,16 @@ def extract_urls(content):
 
 def firecrawl_submit_crawl(url):
     headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.6422.76 Safari/537.36",
         "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
         "Accept-Language": "en-US,en;q=0.9,zh-CN;q=0.8,zh;q=0.7",
         "Referer": "https://www.biorxiv.org/",
+        "Origin": "https://www.biorxiv.org",
+        "DNT": "1",
+        "Connection": "keep-alive",
+        "Cache-Control": "max-age=0",
+        "Accept-Encoding": "gzip, deflate, br",
+        "Upgrade-Insecure-Requests": "1",
         'Content-Type': 'application/json'
     }
     logging.info(f"Submitting crawl job for URL: {url}")
