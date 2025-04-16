@@ -63,7 +63,6 @@ def debug_redirects(url):
         traceback.print_exc()
         return None
 
-
 if __name__ == '__main__':
-    url = 'https://www.biorxiv.org/cgi/reprint/2023.11.27.568912v2??collection'
+    url = 'https://www.biorxiv.org/cgi/reprint/2023.11.27.568912v2'
     print(debug_redirects(url))
