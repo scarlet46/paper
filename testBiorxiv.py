@@ -38,5 +38,5 @@ def debug_redirects(url):
 
 
 if __name__ == '__main__':
-    url = 'https://www.biorxiv.org/content/biorxiv/early/2025/04/12/2023.11.27.568912.full.pdf?%3Fcollection='
+    url = 'https://www.biorxiv.org/cgi/reprint/2023.11.27.568912v2??collection'
     print(debug_redirects(url))
