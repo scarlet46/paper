@@ -3,7 +3,7 @@ from datetime import datetime
 
 from crewai import Crew, Agent, LLM, Task
 
-from pdf_server import process_pdf
+from pdf_server import process_pdf, process_pdf_local
 
 # 设置 Ollama API 环境变量
 # Model = "gpt-4o-mini"
@@ -134,6 +134,45 @@ def process_agent():
 def process_paper(url):
     # markdown_content = firecrawl_crawl(url)
     markdown_content = process_pdf(url)
+    logging.info(f"Processing paper markdown_content: {markdown_content}")
+    if markdown_content is not None and markdown_content.strip():
+
+        # 添加类型判断
+        crew = Crew(
+            agents=[process_agent()],
+            tasks=[create_process_task(markdown_content, url)],
+            share_crew=False,
+            verbose=True
+        )
+
+        result = crew.kickoff().raw
+
+        # 判断类型
+        paper_type_crew = Crew(
+            agents=[paper_type_agent()],
+            tasks=[create_paper_type_task(result)],
+            share_crew=False,
+            verbose=True
+        )
+        paper_type = paper_type_crew.kickoff().raw
+        logging.info(f"Paper type: {paper_type}")
+        print(f"Paper type: {paper_type}")
+        if "忽略" in paper_type:
+            logging.info(f"Ignoring paper from URL: {url}")
+            print(f"Ignoring paper from URL: {url}")
+            return None
+
+        # 根据类型设置文件名称
+        now = datetime.now()
+        now_str = now.strftime("%Y%m%d")
+        output_file = f"{now_str}_"
+        # Format the final output
+        formatted_output = f"""{result} \n\n## 原文链接\n{url} \n\n"""
+        return output_file, formatted_output
+    return None
+
+def process_paper_local(url):
+    markdown_content = process_pdf_local(url)
     logging.info(f"Processing paper markdown_content: {markdown_content}")
     if markdown_content is not None and markdown_content.strip():
 

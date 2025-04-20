@@ -21,6 +21,37 @@ def download_file(url: str) -> bytes:
         return b''
 
 
+import requests
+
+
+def download_feishu_file(access_token, file_token, save_path):
+    """下载飞书普通文件"""
+    # 1. 获取下载链接
+    url = f"https://open.feishu.cn/open-apis/drive/v1/files/{file_token}/download"
+    headers = {
+        "Authorization": f"Bearer {access_token}"
+    }
+
+    response = requests.get(url, headers=headers)
+    download_info = response.json()
+
+    if download_info.get("code") != 0:
+        raise Exception(f"获取下载链接失败: {download_info}")
+
+    download_url = download_info.get("data", {}).get("download_url")
+
+    if not download_url:
+        raise Exception("未找到下载链接")
+
+    # 2. 下载文件
+    file_response = requests.get(download_url)
+
+    with open(save_path, 'wb') as f:
+        f.write(file_response.content)
+
+    return save_path
+
+
 # 下载图像
 def download_image(url: str) -> PILImage:
     response = requests.get(url)
