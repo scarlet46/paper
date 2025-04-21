@@ -168,7 +168,7 @@ def process(urls):
                     f":Failed to process 执行异常,获取PDF内容失败: {url}")
                 logging.warning(f"Failed to process URL: {url}")
         send_feishu_message(
-            f"开始执行飞书文件夹,总共{len(urls)}条数据,获取到文件夹token:{file_token}")
+            f"开始执行飞书文件夹任务,总共{len(urls)}条数据,获取到文件夹token:{file_token}")
     else:
         print("未提取到任何URL。")
         send_feishu_message(
