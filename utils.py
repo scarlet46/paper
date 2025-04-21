@@ -45,8 +45,24 @@ def paper_type_agent():
                 【算法维度】根据文献用到的核心算法，进行三级分类：
                 一级分类：给出传统机器学习（主要指不基于神经网络的统计模型+规则设计，通常具备可解释性和数据推导支持） vs 深度学习（主要指基于多层神经网络结构，端到端优化或表征学习）
                 二级分类：分别给出算法任务类型和模型结构类型，其中任务类算法（function-based task types）包括回归（Regression），分类（Classification），聚类（Clustering），生成模型（Generative Models），表征学习/嵌入（Representation Learning/Embedding），顺序建模（Sequential Modeling），强化学习（Reinforcement Learning），因果推理与图模型（Causal Inference / Graph Models）等，结构类算法（model architecture types）包括传统算法（回归/分类/聚类/贝叶斯/HMM），卷积神经网络（CNN），循环神经网络（RNN），变换器结构（Transformer），生成对抗网络（GAN），自编码器（AE/VAE），扩散模型（Diffusion Models），图神经网络（GNN），神经微分方程（Neural ODE），多模态融合结构（Multimodal Architectures）等。
-                三级分类：给出具体算法架构或工具包，例如：回归算法包括线性回归/回归树/岭回归（Ridge Regression）/Lasso回归等；分类算法包括逻辑回归/支持向量机（SVM）/决策树（Decision Tree）/随机森林（Random Forest）等；聚类算法包括仿射传播（Affinity Propagation）/K均值（K-Means）/层次聚类（Hierarchical Clustering）等；其他传统算法--贝叶斯网络（Bayesian Networks）或隐马尔可夫模型（HMM）等；卷积神经网络（CNN）包括ResNet/VGG等；循环神经网络（RNN）包括LSTM/GRU等；生成对抗网络（GAN）包括DCGAN/StyleGAN等；深度变分自编码器（VAE）包括cVAE等；扩散模型（Diffusion Models）包括Stable Diffusion/DiT等；深度强化学习（DRL）包括DQN/PPO等；Transformer大模型架构包括BERT/GPT系列，或者ViT/DiT系列等；多模态模型包括DALL-E/CLIP等
-                【数据类型维度】据文献用到的数据类型，进行二级分类：
+                三级分类：给出具体算法架构或工具包，例如二级类别对应的三级分类（代表架构/方法）如下：
+                回归：线性回归、岭回归（Ridge）、Lasso、回归树
+                分类：逻辑回归、SVM、KNN、随机森林、朴素贝叶斯
+                聚类：K-means、谱聚类、层次聚类、Affinity Propagation
+                传统图模型：贝叶斯网络、隐马尔可夫模型（HMM）
+                CNN：LeNet、VGG、ResNet、DenseNet
+                RNN：LSTM、GRU、BiRNN
+                Transformer：BERT、GPT系列、T5、ViT、DeiT、DiT
+                GAN：DCGAN、StyleGAN、CycleGAN、Pix2Pix
+                VAE：β-VAE、cVAE、VQ-VAE、VAE-GAN
+                Diffusion：DDPM、DDIM、Stable Diffusion、DiT、Imagen
+                GNN：GCN、GAT、GraphSAGE、DGL实现
+                表征学习：Word2Vec、AutoEncoder、Contrastive Learning (SimCLR, MoCo)
+                多模态：CLIP、DALL·E、BLIP、ALIGN、Flamingo
+                强化学习：DQN、DDPG、A3C、PPO、SAC
+                神经ODE：NeuralODE、LatentODE、DiffEqFlux
+                因果推理：DoWhy、CausalNex、TCDF、Granger因果例如：回归算法包括线性回归/回归树/岭回归（Ridge Regression）/Lasso回归等；分类算法包括逻辑回归/支持向量机（SVM）/决策树（Decision Tree）/随机森林（Random Forest）等；聚类算法包括仿射传播（Affinity Propagation）/K均值（K-Means）/层次聚类（Hierarchical Clustering）等；其他传统算法--贝叶斯网络（Bayesian Networks）或隐马尔可夫模型（HMM）等；卷积神经网络（CNN）包括ResNet/VGG等；循环神经网络（RNN）包括LSTM/GRU等；生成对抗网络（GAN）包括DCGAN/StyleGAN等；深度变分自编码器（VAE）包括cVAE等；扩散模型（Diffusion Models）包括Stable Diffusion/DiT等；深度强化学习（DRL）包括DQN/PPO等；Transformer大模型架构包括BERT/GPT系列，或者ViT/DiT系列等；多模态模型包括DALL-E/CLIP等
+                【数据类型维度】根据文献用到的数据类型，进行二级分类：
                 一级分类：给出主要数据类型，例如：基因组数据/转录组数据/蛋白质组数据/代谢组数据/表观组数据/影像数据/临床数据/文本数据/多模态数据等
                 二级分类：给出具体数据子类型，例如：
                     - 基因组数据：全基因组测序(WGS)/外显子组测序(WES)/靶向测序/SNP芯片等
@@ -59,11 +75,12 @@ def paper_type_agent():
                     - 多模态数据：多组学整合/影像组学/临床组学等
                 【关注维度】根据文献内容，将文章分为三类：
                 第一类（重点关注）：同时满足以下所有条件的文章：
-                    - 预测各种干扰后表达谱变化的研究
+                    - 预测基因扰动和药物扰动后表达谱变化的研究（gene or drug perturbation prediction）
                     - 使用深度学习方法（如CNN、RNN、GAN、DRL、VAE、扩散模型、Transformer架构）
                     - 处理关键数据类型（基因组、转录组、表观组、蛋白质组或多模态数据）的研究
                     - 研究对象为人类或小鼠 
                 第二类（一般关注）：满足以下条件之一的文章：
+                    - 预测基因扰动和药物扰动后表达谱变化的研究（gene or drug perturbation prediction）
                     - 单细胞算法开发（包括工具开发、单细胞多组学分析，多组学整合等）
                     - 基于深度学习和大模型框架的数据处理
                     - 实验数据挖掘研究
