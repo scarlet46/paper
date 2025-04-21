@@ -172,7 +172,7 @@ def process(urls):
     else:
         print("未提取到任何URL。")
         send_feishu_message(
-            f"开始执行飞书文件夹,总共{len(urls)}条数据,未提取到任何URL")
+            f"开始执行飞书文件夹任务,总共{len(urls)}条数据,未提取到任何URL")
 
 
 def main():
