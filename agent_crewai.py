@@ -22,6 +22,8 @@ from feishu.feishu import file_upload, create_file
 from feishu.feishu_webhook import send_feishu_message
 from utils import process_paper, sanitize_file_name
 
+ERROR_CONTENT = '无法解码的Base64内容'
+
 os.environ["OTEL_SDK_DISABLED"] = "true"
 faulthandler.enable()
 
@@ -113,13 +115,50 @@ def decode_content(part):
     charset = part.get_content_charset() or 'utf-8'
     payload = part.get_payload(decode=True)
 
-    # Handle different encoding methods
-    if part['Content-Transfer-Encoding'] == 'quoted-printable':
-        decoded_content = quopri.decodestring(payload).decode(charset, errors='ignore')
-    elif part['Content-Transfer-Encoding'] == 'base64':
-        decoded_content = base64.b64decode(payload).decode(charset, errors='ignore')
-    else:
-        decoded_content = payload.decode(charset, errors='ignore')
+    # 如果payload为None，返回空字符串
+    if payload is None:
+        return ""
+
+    # 处理不同的编码方法
+    content_transfer_encoding = part.get('Content-Transfer-Encoding', '').lower()
+
+    try:
+        if content_transfer_encoding == 'quoted-printable':
+            decoded_content = quopri.decodestring(payload).decode(charset, errors='ignore')
+        elif content_transfer_encoding == 'base64':
+            # 修复Base64填充问题
+            try:
+                # 尝试直接解码
+                decoded_content = base64.b64decode(payload).decode(charset, errors='ignore')
+            except Exception as e:
+                # 如果失败，尝试修复填充
+                padding_fixed_payload = payload
+                missing_padding = len(payload) % 4
+                if missing_padding:
+                    padding_fixed_payload = payload + b'=' * (4 - missing_padding)
+
+                try:
+                    decoded_content = base64.b64decode(padding_fixed_payload).decode(charset, errors='ignore')
+                except:
+                    # 如果仍然失败，尝试使用更宽松的解码方式
+                    try:
+                        import binascii
+                        # 移除所有非base64字符
+                        clean_payload = b''.join(c for c in payload if
+                                                 c in b'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=')
+                        decoded_content = binascii.a2b_base64(clean_payload).decode(charset, errors='ignore')
+                    except:
+                        # 如果所有尝试都失败，返回原始内容的字符串表示
+                        decoded_content = f"[{ERROR_CONTENT}: {str(payload)}]"
+        else:
+            # 对于其他编码或无编码的情况
+            if isinstance(payload, bytes):
+                decoded_content = payload.decode(charset, errors='ignore')
+            else:
+                decoded_content = str(payload)
+    except Exception as e:
+        # 捕获所有异常，确保函数不会崩溃
+        decoded_content = f"[解码错误: {str(e)}]"
 
     return decoded_content
 
@@ -212,21 +251,43 @@ def get_final_url(input_url):
         return None
 
 
+# 解析内容的url 目前遇到两种,一种html 一种纯文本
 def extract_urls(content):
-    logging.info('Extracting URLs from content')
-    soup = BeautifulSoup(content, 'html.parser')
-    # 提取标题
-    titles = [div.get_text().strip()
-              for div in soup.find_all('div', class_='citation_title')]
+    # 普通文本解析
+    if ERROR_CONTENT in content:
+        # 使用http://分割文本
+        parts = content.split("http://")
+        # 创建一个列表存储结果
+        results = []
+        # 对于每个http://部分（除了第一部分）
+        for i in range(1, len(parts)):
+            url = "http://" + parts[i].split()[0]
+            # 向前查找最近的标题
+            # 标题通常是以多个空格开头的行
+            previous_text = parts[i - 1]
+            lines = previous_text.split('\\r\\n')
+            # 从后向前查找
+            for line in reversed(lines):
+                if line.strip() and line.startswith("       "):  # 7个空格是标题的特征
+                    title = line.strip()
+                    results.append({"title": title, "url": url})
+                    break
+        return results
+    else:
+        logging.info('Extracting URLs from content')
+        soup = BeautifulSoup(content, 'html.parser')
+        # 提取标题
+        titles = [div.get_text().strip()
+                  for div in soup.find_all('div', class_='citation_title')]
 
-    # 提取PDF链接
-    pdf_urls = [a['href']
-                for div in soup.find_all('div', class_='view_list')
-                for a in div.find_all('a', href=True)
-                if a['href'].startswith('http') and a.get_text() == '[PDF]']
+        # 提取PDF链接
+        pdf_urls = [a['href']
+                    for div in soup.find_all('div', class_='view_list')
+                    for a in div.find_all('a', href=True)
+                    if a['href'].startswith('http') and a.get_text() == '[PDF]']
 
-    # 将标题和URL组合成字典列表
-    return [{"title": title, "url": url} for title, url in zip(titles, pdf_urls)]
+        # 将标题和URL组合成字典列表
+        return [{"title": title, "url": url} for title, url in zip(titles, pdf_urls)]
 
 
 def firecrawl_submit_crawl(url):
