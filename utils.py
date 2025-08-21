@@ -20,7 +20,7 @@ Model = "volcengine/deepseek-v3-241226"
 llm = LLM(
     model=Model,
     base_url="https://ark.cn-beijing.volces.com/api/v3",
-    api_key="74cfeb2a-831e-477d-91cd-9d60fd18405d"
+    api_key="b3db7d98-282e-46a7-98fb-928d3363ee61"
 )
 
 
