@@ -1,8 +1,9 @@
 import base64
+import time
 from io import BytesIO
+from urllib.parse import unquote
 
 import lark_oapi as lark
-import requests
 from PIL import Image as PILImage
 from lark_oapi.api.optical_char_recognition.v1 import *
 
@@ -12,12 +13,64 @@ SK = 'SS0tzsmOWEIh4K12kRgRWerBCboX0Nys'
 
 # 下载文件
 def download_file(url: str) -> bytes:
+    """
+    下载文件，支持bioRxiv等学术网站的反爬虫机制
+
+    Args:
+        url (str): 文件下载URL
+
+    Returns:
+        bytes: 文件内容，失败时返回空字节
+    """
     try:
-        response = requests.get(url)
+        # 清理URL编码问题
+        clean_url = unquote(url)
+        print(f"📥 正在下载: {clean_url}")
+
+        # 设置请求头，模拟真实浏览器
+        headers = {
+            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
+            'Accept': 'application/pdf,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language': 'en-US,en;q=0.9',
+            'Accept-Encoding': 'gzip, deflate, br',
+            'Connection': 'keep-alive',
+            'Upgrade-Insecure-Requests': '1',
+            'Sec-Fetch-Dest': 'document',
+            'Sec-Fetch-Mode': 'navigate',
+            'Sec-Fetch-Site': 'same-origin',
+            'Cache-Control': 'max-age=0'
+        }
+
+        # 创建会话
+        session = requests.Session()
+        session.headers.update(headers)
+
+        # 先访问主页建立会话（对bioRxiv很重要）
+        base_url = 'https://www.biorxiv.org/'
+        try:
+            session.get(base_url, timeout=10)
+            time.sleep(1)  # 短暂等待
+        except:
+            pass  # 如果主页访问失败，继续尝试直接下载
+
+        # 下载文件
+        response = session.get(clean_url, timeout=30)
         response.raise_for_status()
-        return response.content
+
+        # 检查响应内容类型
+        content_type = response.headers.get('content-type', '').lower()
+        if 'pdf' in content_type or len(response.content) > 1000:
+            print(f"✅ 下载成功，文件大小: {len(response.content)} 字节")
+            return response.content
+        else:
+            print(f"⚠️ 可能不是PDF文件，内容类型: {content_type}")
+            return response.content
+
     except requests.RequestException as e:
-        print(f"下载文件失败: {e}")
+        print(f"❌ 下载文件失败: {e}")
+        return b''
+    except Exception as e:
+        print(f"❌ 未知错误: {e}")
         return b''
 
 

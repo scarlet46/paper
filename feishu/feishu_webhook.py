@@ -6,7 +6,7 @@ import requests
 def send_feishu_message(message):
     # webhook URL
     # webhook_url_v1 = "https://open.feishu.cn/open-apis/bot/v2/hook/44f3fbf1-60ad-4664-9fac-b99670c28117"
-    webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/867dbf60-9939-4e46-9a23-3388c933cd51"
+    webhook_url = "https://open.feishu.cn/open-apis/bot/v2/hook/3f1cd2cb-09ea-497c-bb9a-4a193c035648"
 
     # 构建消息内容
     data = {

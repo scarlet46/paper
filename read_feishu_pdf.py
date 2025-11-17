@@ -114,7 +114,7 @@ class FeishuDriveClient:
                 all_files.extend(subfolder_files)
             else:
                 # 如果是文件，直接添加到结果列表
-                all_files.append(file.get("url"))
+                all_files.append({"url":file.get("url"),"file_name":file.get("name")})
 
         return all_files
 
@@ -129,8 +129,10 @@ def process(urls):
         f"开始执行飞书文件夹补充,总共{len(urls)}条数据,获取到文件夹token:{file_token}")
     if urls:
         print("提取的URL如下：")
-        for url in urls:
-            print(url)
+        for url_obj in urls:
+            print(url_obj)
+            url = url_obj.get("url")
+            url_name = url_obj.get("file_name")
             # 下载文件到本地
             downloader = FeishuFileDownloader(APP_ID, APP_SECRET)
             saved_path = downloader.download_file(url, SAVE_DIR)
@@ -144,7 +146,7 @@ def process(urls):
             if result:
                 try:
                     output_file, formatted_output = result
-                    file_name = output_file + "_" + url + ".md"
+                    file_name = url_name + ".md"
                     file_name = sanitize_file_name(file_name)
                     # 判断文件是否存在，如果不存在创建文件增加metadata
                     if not os.path.exists(file_name):
@@ -168,11 +170,11 @@ def process(urls):
                     f":Failed to process error 执行异常,获取PDF内容失败: {url}")
                 logging.warning(f"Failed to process URL: {url}")
         send_feishu_message(
-            f"开始执行飞书文件夹任务,总共{len(urls)}条数据,获取到文件夹token:{file_token}")
+            f"结束执行飞书文件夹任务,总共{len(urls)}条数据,获取到文件夹token:{file_token}")
     else:
         print("未提取到任何URL。")
         send_feishu_message(
-            f"开始执行飞书文件夹任务,总共{len(urls)}条数据,未提取到任何URL")
+            f"结束执行飞书文件夹任务,总共{len(urls)}条数据,未提取到任何URL")
 
 
 def main():

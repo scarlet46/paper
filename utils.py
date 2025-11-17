@@ -1,8 +1,9 @@
 import logging
 from datetime import datetime
 
+from biorxiv_selenium_downloader import BioRxivSeleniumDownloader
+from browser_get_url import get_real_url_with_visual_browser
 from crewai import Crew, Agent, LLM, Task
-
 from pdf_server import process_pdf, process_pdf_local
 
 # 设置 Ollama API 环境变量
@@ -196,9 +197,66 @@ def process_agent():
     )
 
 
-def process_paper(url):
-    # markdown_content = firecrawl_crawl(url)
-    markdown_content = process_pdf(url)
+def process_paper(url, is_local_file=False, page_num=100):
+    if not is_local_file:
+        # 检查是否为 bioRxiv URL，如果是则使用专门的处理器
+        if 'biorxiv.org' in url.lower():
+            logging.info(f"检测到 bioRxiv URL: {url}")
+
+            # 1. 首先尝试直接处理 URL
+            try:
+                logging.info("尝试直接处理 bioRxiv URL...")
+                markdown_content = process_pdf(url)
+
+                if markdown_content and markdown_content.strip():
+                    logging.info("直接处理 bioRxiv URL 成功")
+                else:
+                    logging.warning("直接处理返回空内容，尝试下载处理")
+                    raise Exception("直接处理返回空内容")
+
+            except Exception as e:
+                logging.warning(f"直接处理失败: {e}")
+                logging.info("尝试使用 Selenium 下载后处理...")
+
+                # 2. 直接处理失败，使用 Selenium 下载
+                downloader = BioRxivSeleniumDownloader()
+                downloader.set_cookie_string('''
+                                                _ga=GA1.1.286901066.1739618871; dsq__u=8tb657p8ldllr; dsq__s=8tb657p8ldllr; _lc2_fpi=28e3293678dc--01jm4nv7gvkp4j5sas17qt968v; cookie-agreed=2; SSESS1dd6867f1a1b90340f573dcdef3076bc=9Z72nF9I-MyqdqRfcJZGC3RZpPH3vGjvblBqvbBYUio; _li_ss=CgA; cf_clearance=JNEmmRvDMaV4eE2T6BlzBjPmx4erKDMM9zOUFJe.aEY-1758710449-1.2.1.1-OCdlkdqtrMbjknFIGT8P7lrqdW8oqCnbgnr4AtXpAaEoydIJ0ihOgIh5USnDU62DirFyRartBHOADHDkUXa3iH7xzAI_IbPCJ_8cg6O1cXH9r1d.mpX6Cdw5qATyFlqZBmOzoTYa3deq0pFwZK2NYK9i8DP9pVvFqZxHECdBiy_e9vyMjWxP_2VHXxq0pQsrzjAl7uKhV8DJkjgcv99zkrtOttvXtQ96savnPYOlqOo; _ga_RZD586MC3Q=GS2.1.s1758793902$o7$g1$t1758794165$j60$l0$h0; __cf_bm=XnA1dhhr9YkZt91WbTaCQct58p3qvAnLpEx8WBHAsC4-1760244202-1.0.1.1-cPLNvjasyslEeSORmquvLuer_bO6QywwFTXOI8mSqweHfRsZHBj2ep3EaX9DcrCgCiJlU2xVTlp8IYTKi1Z_58Kuh87zZkOwKqgawQ7imMw; _cfuvid=.tjpF4QGjNS.bYKaTJXEaXdtKgMs2EZS1vmwUJvrfxQ-1760244202528-0.0.1.1-604800000''')
+                success, local_file_path, message = downloader.download_biorxiv_pdf(url)
+
+                if success and local_file_path and os.path.exists(local_file_path):
+                    logging.info(f"Selenium 下载成功: {local_file_path}")
+                    try:
+                        # 使用本地文件处理
+                        markdown_content = process_pdf_local(local_file_path)
+
+                        if markdown_content and markdown_content.strip():
+                            logging.info("本地文件处理成功")
+                        else:
+                            logging.error("本地文件处理返回空内容")
+                            markdown_content = None
+
+                    except Exception as local_e:
+                        logging.error(f"本地文件处理失败: {local_e}")
+                        markdown_content = None
+                    finally:
+                        # 清理临时文件
+                        downloader.cleanup_file(local_file_path)
+                else:
+                    logging.error(f"Selenium 下载失败: {message}")
+                    # 兜底 调用浏览器获取真实url地址.
+                    reality_url = get_real_url_with_visual_browser(url)
+                    if reality_url is None:
+                        logging.error(f"所有方法均无法现在该pdf:{url}")
+                        return None
+                    markdown_content = process_pdf(reality_url)
+                    return markdown_content
+        else:
+            # 非 bioRxiv URL，使用常规处理
+            markdown_content = process_pdf(url)
+    else:
+        markdown_content = process_pdf_local(url, page_num)
+    
     logging.info(f"Processing paper markdown_content: {markdown_content}")
     if markdown_content is not None and markdown_content.strip():
 
@@ -225,7 +283,7 @@ def process_paper(url):
         if "忽略" in paper_type:
             logging.info(f"Ignoring paper from URL: {url}")
             print(f"Ignoring paper from URL: {url}")
-            return None
+            return "忽略"
 
         # 根据类型设置文件名称
         now = datetime.now()
@@ -306,3 +364,7 @@ def sanitize_file_name(name, max_length=200):
     sanitized_name = sanitized_base + ext
     return sanitized_name
 
+# if __name__ == '__main__':
+#     print(process_paper(
+#         "/Users/liuxiansen/PycharmProjects/paper-summarizer/crewai/email_download/20251013/bioRxiv_Subject_Collection_Alert&&time&&2025-10-12_17-02-46/Sustainability_During_Instability__Long-Lived_Life_Science_Databases_and_Science_Funding_Outlook_in_the_United_States.pdf",
+#         is_local_file=True))

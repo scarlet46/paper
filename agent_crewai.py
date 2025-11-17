@@ -5,12 +5,10 @@ import imaplib
 import logging
 import os
 import quopri
-import re
 import time
 from datetime import datetime, timedelta
 from email import policy
 from email.utils import parsedate_to_datetime
-from urllib.parse import urlparse, parse_qs, unquote
 
 import backoff
 import requests
@@ -91,8 +89,9 @@ FIRECRAWL_API_KEY = os.getenv('FIRECRAWL_API_KEY')
 FIRECRAWL_API_URL = 'http://140.143.139.183:3002/v1'
 
 # 监控发件人邮箱地址
-SENDER_EMAIL = 'cshljnls-mailer@alerts.highwire.org'
-DAYS_RECENT = 3
+# SENDER_EMAIL = 'cshljnls-mailer@alerts.highwire.org'
+SENDER_EMAIL = 'openRxiv-mailer@alerts.highwire.org'
+DAYS_RECENT = 7
 
 os.environ['CREWAI_DISABLE_TELEMETRY'] = 'true'
 
@@ -207,47 +206,6 @@ def fetch_email_content(mail, email_id):
 
     except Exception as e:
         logging.error(f"Error getting email content for email ID: {email_id}: {e}")
-        return None
-
-
-def normalize_biorxiv_url(url):
-    try:
-        # 移除多余的问号和collection参数
-        url = re.sub(r'\?+collection$', '', url)
-
-        # 检查是否是旧格式的 URL (cgi/content/abstract)
-        if 'cgi/content/abstract' in url:
-            # 提取文章ID
-            match = re.search(r'abstract/(\d{4}\.\d{2}\.\d{2}\.\d+v\d+)', url)
-            if match:
-                article_id = match.group(1)
-                # 构造新格式的 URL
-                new_url = f"https://www.biorxiv.org/content/10.1101/{article_id}.abstract"
-                logging.info(f"Converted bioRxiv URL from {url} to {new_url}")
-                return new_url
-
-        return url
-    except Exception as e:
-        logging.error(f"Error normalizing bioRxiv URL {url}: {e}")
-        return url
-
-
-def get_final_url(input_url):
-    try:
-        # 提取并解码url参数
-        parsed_url = urlparse(input_url)
-        query_params = parse_qs(parsed_url.query)
-        encoded_url = query_params.get('url', [None])[0]
-
-        if not encoded_url:
-            logging.error(f"No 'url' parameter found in {input_url}")
-            return None
-
-        final_url = unquote(encoded_url)
-        logging.info(f"Decoded URL: {final_url}")
-        return final_url
-    except requests.RequestException as e:
-        logging.error(f"Error resolving final URL for {input_url}: {e}")
         return None
 
 
